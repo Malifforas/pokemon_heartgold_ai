@@ -1,9 +1,8 @@
 import threading
 
-import debug
+from debug import check_keypresses
 from screen import Screen
-from player import Player
-from player import RewardSystem
+from player import Player, RewardSystem
 
 
 class AI:
@@ -18,5 +17,7 @@ class AI:
             self.screen.capture()
             # Add logic to process captured screen and determine actions for player
             self.player.move_up()  # Example action
+
+
 # Start logging keypresses
-threading.Thread(target=debug.check_keypresses).start()
+threading.Thread(target=check_keypresses).start()

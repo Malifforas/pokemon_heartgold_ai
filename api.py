@@ -33,3 +33,30 @@ class PokemonAPI:
             return move_info
         else:
             raise Exception(f"Error: {response.status_code}")
+
+    def get_ability_info(self, ability_name):
+        url = f'{self.base_url}ability/{ability_name}'
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            ability_info = {
+                'name': data['name'],
+                'description': data['effect_entries'][0]['short_effect']
+            }
+            return ability_info
+        else:
+            raise Exception(f"Error: {response.status_code}")
+
+    def get_game_info(self, game_name):
+        url = f'{self.base_url}version/{game_name}'
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            game_info = {
+                'name': data['name'],
+                'generation': data['generation']['name'],
+                'release_date': data['release_date']
+            }
+            return game_info
+        else:
+            raise Exception(f"Error: {response.status_code}")

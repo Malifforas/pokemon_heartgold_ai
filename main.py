@@ -1,7 +1,7 @@
 from time import sleep
 from random import randint
 
-from emulator.desmu import Emulator
+from desmu import Emulator
 from api import PokemonAPI
 from screen import Screen
 from nuzlock import Nuzlock
