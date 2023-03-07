@@ -14,12 +14,13 @@ class Screen:
             self._screenshot = np.array(screenshot)
 
     def get_player_position(self):
+        if self._screenshot is None:
+            return None
+
+        # Load up the sprite for the player
         player_image_url = 'https://www.spriters-resource.com/resources/sheets/24/26777.png?updated=1460955691'
         response = requests.get(player_image_url)
         player_image = cv2.imdecode(np.frombuffer(response.content, np.uint8), -1)
-
-        if self._screenshot is None:
-            return None
 
         # Template matching
         res = cv2.matchTemplate(self._screenshot, player_image, cv2.TM_CCOEFF_NORMED)
