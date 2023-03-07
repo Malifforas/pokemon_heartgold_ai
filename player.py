@@ -2,10 +2,21 @@ import cv2
 import numpy as np
 import time
 import os
-
 from screen import Screen
 from controller import Controller
-from reward import RewardSystem
+class RewardSystem:
+    def __init__(self):
+        self.reward = 0
+
+    def get_reward(self):
+        return self.reward
+
+    def give_reward(self, amount):
+        self.reward += amount
+
+    def take_reward(self, amount):
+        self.reward -= amount
+
 
 class Player:
     def __init__(self):
