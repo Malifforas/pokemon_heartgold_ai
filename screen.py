@@ -17,11 +17,15 @@ class Screen:
         response = requests.get(player_image_url)
         player_image = cv2.imdecode(np.frombuffer(response.content, np.uint8), -1)
 
-        roi = (250, 130, 300, 250)
-        location = pyautogui.locateOnScreen(image=player_image, grayscale=True, region=roi)
-        if location:
-            center_x = location[0] + location[2] // 2
-            center_y = location[1] + location[3] // 2
+        screenshot_gray = cv2.cvtColor(self._screenshot, cv2.COLOR_BGR2GRAY)
+        player_gray = cv2.cvtColor(player_image, cv2.COLOR_BGR2GRAY)
+
+        result = cv2.matchTemplate(screenshot_gray, player_gray, cv2.TM_CCOEFF_NORMED)
+        threshold = 0.8
+        loc = np.where(result >= threshold)
+        if len(loc[0]) > 0 and len(loc[1]) > 0:
+            center_x = int(loc[1][0] + player_gray.shape[1] / 2)
+            center_y = int(loc[0][0] + player_gray.shape[0] / 2)
             return center_x, center_y
         return None
 
@@ -34,13 +38,13 @@ class Screen:
 
     def wait_until_loaded(self):
         while not self.is_loaded():
+            self.capture_screenshot()
             time.sleep(1)
 
 def main():
     screen = Screen()
 
     while True:
-        screen.capture_screenshot()
         screen.wait_until_loaded()
 
         player_position = screen.get_player_position()
