@@ -6,6 +6,8 @@ from emulator.desmu import Emulator
 from pokeapi.api import PokemonAPI
 from screen import Screen
 
+import config
+
 
 def main():
     # Initialize objects
@@ -38,6 +40,8 @@ def main():
     new_position = (player_position[0], player_position[1] + 1)
     screen.move_player_to(new_position)
     emulator.press_a()
-
+# Use the configuration settings
+print(config.SCREEN_WIDTH)
+print(config.BUTTON_A)
 if __name__ == '__main__':
     main()
