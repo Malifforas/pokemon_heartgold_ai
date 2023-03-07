@@ -1,10 +1,12 @@
 import sys
 import os
+from time import sleep
+from random import randint
 
-sys.path.append(os.path.abspath('pokeapi'))
 from emulator.desmu import Emulator
 from pokeapi.api import PokemonAPI
 from screen import Screen
+from nuzlock import Nuzlock
 
 import config
 
@@ -14,34 +16,41 @@ def main():
     emulator = Emulator()
     api = PokemonAPI()
     screen = Screen()
+    nuzlock = Nuzlock(api)
 
     # Load up the game on the emulator
     emulator.press_start()
-
-    # Select continue game
     emulator.press_a()
     emulator.press_a()
 
     # Wait for game to load
     screen.wait_until_loaded()
 
-    # Get the player's current position
-    player_position = screen.get_player_position()
+    while True:
+        # Check for nuzlocke rules
+        nuzlock.check_rules(screen, emulator)
 
-    # Get the nearby pokemon
-    nearby_pokemon = screen.get_nearby_pokemon()
+        # Get the player's current position
+        player_position = screen.get_player_position()
 
-    # Get information on the nearby pokemon from the API
-    for pokemon in nearby_pokemon:
-        pokemon_data = api.get_pokemon_info(pokemon)
-        print(pokemon_data)
+        # Get the nearby pokemon
+        nearby_pokemon = screen.get_nearby_pokemon()
 
-    # Move the player to a new position
-    new_position = (player_position[0], player_position[1] + 1)
-    screen.move_player_to(new_position)
-    emulator.press_a()
+        # Get information on the nearby pokemon from the API
+        for pokemon in nearby_pokemon:
+            pokemon_data = api.get_pokemon_info(pokemon)
+            print(pokemon_data)
+
+        # Move the player to a new position
+        direction = ['up', 'down', 'left', 'right'][randint(0, 3)]
+        new_position = screen.get_new_position(player_position, direction)
+        screen.move_player_to(new_position)
+        emulator.move(direction)
+        sleep(1)
+
 # Use the configuration settings
 print(config.SCREEN_WIDTH)
 print(config.BUTTON_A)
+
 if __name__ == '__main__':
     main()
