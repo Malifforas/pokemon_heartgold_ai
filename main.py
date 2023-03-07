@@ -1,10 +1,8 @@
-import sys
-import os
 from time import sleep
 from random import randint
 
 from emulator.desmu import Emulator
-from pokeapi.api import PokemonAPI
+from api import PokemonAPI
 from screen import Screen
 from nuzlock import Nuzlock
 
