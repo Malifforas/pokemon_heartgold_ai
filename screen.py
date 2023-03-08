@@ -7,6 +7,16 @@ import win32gui
 import win32ui
 import win32con
 
+import cv2
+import numpy as np
+import pyautogui
+import requests
+import time
+import win32gui
+import win32ui
+import win32con
+
+
 class Screen:
     def __init__(self):
         self._screenshot = None
@@ -43,6 +53,8 @@ class Screen:
         while not self.is_loaded():
             self.capture_screenshot()
             time.sleep(1)
+
+
 def find_game_window():
     window_name = "Game Window"  # change this to match your game window title
     hwnd = win32gui.FindWindow(None, window_name)
@@ -82,6 +94,7 @@ def find_game_window():
 
     return img
 
+
 def capture_screen():
     screenshot = pyautogui.screenshot()
     if screenshot is not None:
@@ -91,37 +104,22 @@ def capture_screen():
 def preprocess_image(image):
     # Convert to grayscale
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
     # Threshold to binary
-    thresh = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)[1]
+    thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
 
-    # Invert colors
-    inv = cv2.bitwise_not(thresh)
+    # Find contours
+    contours = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
 
-    return inv
+    # Get largest contour
+    largest_contour = max(contours, key=cv2.contourArea)
 
-def get_game_state():
-    img = find_game_window()
-    if img is None:
-        return None
+    # Get bounding rectangle of largest contour
+    x, y, w, h = cv2.boundingRect(largest_contour)
 
-    # Preprocess the image
-    processed_img = preprocess_image(img)
+    # Crop image to bounding rectangle
+    cropped_image = image[y:y+h, x:x+w]
 
-    # Find the player position
-    player_pos = None
-    player_image_url = 'https://www.spriters-resource.com/resources/sheets/24/26777.png?updated=1460955691'
-    response = requests.get(player_image_url)
-    player_image = cv2.imdecode(np.frombuffer(response.content, np.uint8), -1)
-    res = cv2.matchTemplate(processed_img, player_image, cv2.TM_CCOEFF_NORMED)
-    threshold = 0.8
-    loc = np.where(res >= threshold)
-    if len(loc[0]) > 0:
-        center_x = int(loc[1][0] + player_image.shape[1] / 2)
-        center_y = int(loc[0][0] + player_image.shape[0] / 2)
-        player_pos = (center_x, center_y)
+    # Resize image
+    resized_image = cv2.resize(cropped_image, (80, 80))
 
-    return {
-        'image': processed_img,
-        'player_pos': player_pos,
-    }
+    return resized_image

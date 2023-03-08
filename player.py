@@ -5,201 +5,151 @@ import os
 import json
 import random
 import math
-import screen
+
+import win32api
+import win32con
+
 import pokeapi
 import requests
 
+from oauthlib.oauth2 import BackendApplicationClient
+from requests_oauthlib import OAuth2Session
+
+import screen
 from screen import Screen
 from controller import Controller
 
 from api import PokemonAPI
+from reward import RewardSystem
 
-class RewardSystem:
+
+class Player:
     def __init__(self):
-        self.last_state = None
-        self.last_action = None
-        self.last_reward = None
-        self.pokemon_api = pokeapi.V2Client()
+        self.NUM_STATES = 75
+        self.NUM_ACTIONS = 4  # attack, switch, bag, flee
+        self.ALPHA = 0.1  # learning rate
+        self.GAMMA = 0.9  # discount factor
+        self.EPSILON = 0.1  # exploration rate
+        self.q_table = np.zeros((self.NUM_STATES, self.NUM_ACTIONS))
+        self.reward_system = RewardSystem()
 
-    def get_reward(self, state, action, next_state, pokeheartgold=None):
-        # Calculate current and next state values
-        current_player_pokemon = pokeheartgold.get_active_pokemon()
-        current_opponent_pokemon = pokeheartgold.get_opponent_active_pokemon()
-        current_player_hp = int(
-            current_player_pokemon.current_hp / current_player_pokemon.stats.hp * 100 // 20)
-        current_opponent_hp = int(
-            current_opponent_pokemon.current_hp / current_opponent_pokemon.stats.hp * 100 // 20)
-        current_level_diff = current_player_pokemon.level - current_opponent_pokemon.level
+        self.client = pokeapi.V2Client()
+        self.game_window_name = "Desmume 0.9.11 x64"
+        self.movement_keys = {
+            "up": 0,
+            "down": 1,
+            "left": 2,
+            "right": 3
+        }
 
-        next_player_pokemon = pokeheartgold.get_active_pokemon()
-        next_opponent_pokemon = pokeheartgold.get_opponent_active_pokemon()
-        next_player_hp = int(next_player_pokemon.current_hp / next_player_pokemon.stats.hp * 100 // 20)
-        next_opponent_hp = int(
-            next_opponent_pokemon.current_hp / next_opponent_pokemon.stats.hp * 100 // 20)
-        next_level_diff = next_player_pokemon.level - next_opponent_pokemon.level
+    def start(self):
+        # find game window
+        game_window = self.screen.find_game_window()
 
-        # Get current and next state
-        current_state = current_player_hp * 15 + current_opponent_hp * 3 + current_level_diff + 37
-        next_state = next_player_hp * 15 + next_opponent_hp * 3 + next_level_diff + 37
+        # start game loop
+        while True:
+            # capture screen
+            screen_image = self.screen.capture_screen(game_window)
 
-        # Calculate reward
-        reward = 0.0
-        if next_player_pokemon.current_hp == 0:
-            reward = -1.0
-        elif next_opponent_pokemon.current_hp == 0:
-            reward = 1.0
+            # preprocess screen image for Q-learning
+            processed_image = self.preprocess_screen(screen_image)
 
-        # Update Q-Table
-        current_q = q_table[current_state][action]
-        next_max_q = np.max(q_table[next_state])
-        new_q = current_q + ALPHA * (reward + GAMMA * next_max_q - current_q)
-        q_table[current_state][action] = new_q
+            # get current game state
+            game_state = self.get_game_state(processed_image)
 
-        return reward
+            # choose next action using Q-learning algorithm
+            next_action = self.q_learning(game_state)
 
-        return reward
-    class Player:
-        def __init__(self):
-            # Initialize screen, controller, and reward system
-            # The state space consists of the current Pokemon's HP percentage,
-            # the opponent Pokemon's HP percentage, and the difference in levels between
-            # the two Pokemon. We'll discretize the HP percentages into 5 buckets each
-            # (0-20%, 20-40%, 40-60%, 60-80%, 80-100%) and the level difference into 3
-            # buckets (-5 or lower, -4 to -1, 0 or higher), for a total of 5*5*3 = 75
-            # possible states.
-            NUM_STATES = 75
-            NUM_ACTIONS = 4  # We'll use 4 possible actions: attack, switch, bag, flee
-            ALPHA = 0.1  # learning rate
-            GAMMA = 0.9  # discount factor
-            EPSILON = 0.1  # exploration rate
-            q_table = np.zeros((NUM_STATES, NUM_ACTIONS))
+            # map chosen action to game action
+            game_action = self.map_action(next_action)
 
-            client = pokeapi.V2Client()
+            # perform game action
+            self.perform_action(game_window, game_action)
 
-            class RewardSystem:
-                def __init__(self):
-                    self.last_state = None
-                    self.last_action = None
-                    self.last_reward = None
+            # check if game over
+            if self.screen.is_game_over():
+                break
 
-                def get_reward(self, state, action, next_state, pokeheartgold=None):
-                    # Calculate current and next state values
-                    current_player_pokemon = pokeheartgold.game.get_player().party.get_active_pokemon()
-                    current_opponent_pokemon = pokeheartgold.game.get_opponent().party.get_active_pokemon()
-                    current_player_hp = int(
-                        current_player_pokemon.current_hp / current_player_pokemon.stats['hp'] * 100 // 20)
-                    current_opponent_hp = int(
-                        current_opponent_pokemon.current_hp / current_opponent_pokemon.stats['hp'] * 100 // 20)
-                    current_level_diff = current_player_pokemon.level - current_opponent_pokemon.level
+        # print final score
+        print(f"Game over! Final score: {self.reward_system.last_reward}")
 
-                    next_player_pokemon = pokeheartgold.game.get_player().party.get_active_pokemon()
-                    next_opponent_pokemon = pokeheartgold.game.get_opponent().party.get_active_pokemon()
-                    next_player_hp = int(next_player_pokemon.current_hp / next_player_pokemon.stats['hp'] * 100 // 20)
-                    next_opponent_hp = int(
-                        next_opponent_pokemon.current_hp / next_opponent_pokemon.stats['hp'] * 100 // 20)
-                    next_level_diff = next_player_pokemon.level - next_opponent_pokemon.level
+    def q_learning(self, state):
+        # choose action based on exploration-exploitation tradeoff
+        if np.random.uniform(0, 1) < self.EPSILON:
+            action = np.random.choice(self.NUM_ACTIONS)
+        else:
+            action = np.argmax(self.q_table[state, :])
 
-                    # Get current and next state
-                    current_state = current_player_hp * 15 + current_opponent_hp * 3 + current_level_diff + 37
-                    next_state = next_player_hp * 15 + next_opponent_hp * 3 + next_level_diff + 37
+        # calculate reward for the chosen action
+        next_state, reward = self.reward_system.get_reward(action)
 
-                    # Calculate reward
-                    reward = 0.0
-                    if next_player_pokemon.current_hp == 0:
-                        reward = -1.0
-                    elif next_opponent_pokemon.current_hp == 0:
-                        reward = 1.0
+        # update Q-table
+        current_q = self.q_table[state, action]
+        max_next_q = np.max(self.q_table[next_state, :])
+        new_q = current_q + self.ALPHA * (reward + self.GAMMA * max_next_q - current_q)
+        self.q_table[state, action] = new_q
 
-                    # Update Q-Table
-                    current_q = q_table[current_state][action]
-                    next_max_q = np.max(q_table[next_state])
-                    new_q = current_q + ALPHA * (reward + GAMMA * next_max_q - current_q)
-                    q_table[current_state][action] = new_q
+        return action
 
-                    return reward
-            # TODO: Initialize PokeAPI client
-            client = pokeapi.V2Client()
+    def map_action(self, action):
+        # map action index to corresponding key
+        if action == 0:
+            return "a"
+        elif action == 1:
+            return "s"
+        elif action == 2:
+            return "b"
+        elif action == 3:
+            return self.movement_keys[np.random.choice(list(self.movement_keys.keys()))]
 
-            # Set game window name
-            self.game_window_name = "Desmume 0.9.11 x64"
+    def preprocess_screen(self, screen_image):
+        # convert to grayscale
+        processed_image = cv2.cvtColor(screen_image, cv2.COLOR_RGB2GRAY)
 
-            # Define movement keys
-            self.movement_keys = {
-                "up": 0,
-                "down": 1,
-                "left": 2,
-                "right": 3
-            }
+        # crop to relevant game area
+        processed_image = processed_image[75:375, 25:295]
 
-        def start(self):
-            # Find game window
-            game_window = find_game_window()
+        # resize image to smaller size
+        processed_image = cv2.resize(processed_image, (30, 30))
 
-            # Initialize PokeAPI client
-            client = pokeapi.V2Client()
+        # normalize pixel values to be between 0 and 1
+        processed_image = processed_image / 255.0
 
-            # Get current Pokemon team using PokeAPI
-            current_team = client.get_team()
+        return processed_image
 
-            # Start game loop
-            while True:
-                # Capture screen
-                screen_image = capture_screen(game_window)
+    def get_game_state(self, processed_image):
+        # flatten image into 1D array
+        state = processed_image.flatten()
 
-                # Preprocess screen image for Q-learning
-                processed_image = preprocess_image(screen_image)
+        # add additional features to state
+        player_info = self.screen.get_player_info()
+        enemy_info = self.screen.get_enemy_info()
+        state = np.concatenate((state, player_info, enemy_info))
 
-                # Get current game state
-                game_state = get_game_state(processed_image, current_team)
+        # convert state to integer index
+        state_index = int("".join(str(int(i)) for i in state), 2)
 
-                # Implement Q-learning to choose next action
-                next_action = q_learning(game_state)
+        return state_index
 
-                # Map chosen action to game action
-                game_action = map_action(next_action)
-
-                # Perform action
-                perform_action(game_window, game_action)
-            while True:
-                # Capture screen
-                # TODO: Preprocess screen image for Q-learning
-
-                # Get current game state
-                # TODO: Implement Q-learning to choose next action
-
-                # Perform action
-                # TODO: Map chosen action to game action
-
-                # Wait for game to load
-                if self.screen.is_loading():
-                    self.screen.wait_until_loaded()
-
-                # Check if game over
-                if self.screen.is_game_over():
-                    break
-
-            print(f"Game over! Final score: {self.reward_system.get_reward()}")
-
-        # TODO: Implement Q-learning algorithm
-        def q_learning(self):
-            pass
-
-        # TODO: Implement method to map chosen action to game action
-        def map_action(self, action):
-            pass
-
-        # TODO: Implement method to preprocess screen image for Q-learning
-        def preprocess_screen(self, screen_image):
-            pass
-
-        # TODO: Implement method to get current Pokemon team using PokeAPI
-        def get_pokemon_team(self):
-            pass
-
-        # TODO: Implement method to get Pokemon stats using PokeAPI
-        def get_pokemon_stats(self, pokemon_name):
-            pass
-
-        # TODO: Implement method to get Pokemon move data using PokeAPI
-        def get_move_data(self, move_name):
-            pass
+    def perform_action(self, game_window, game_action):
+        if game_action == "a":
+            # press A key
+            win32api.keybd_event(0x41, 0, 0, 0)
+            time.sleep(0.05)
+            win32api.keybd_event(0x41, 0, win32con.KEYEVENTF_KEYUP, 0)
+        elif game_action == "s":
+            # press S key
+            win32api.keybd_event(0x53, 0, 0, 0)
+            time.sleep(0.05)
+            win32api.keybd_event(0x53, 0, win32con.KEYEVENTF_KEYUP, 0)
+        elif game_action == "b":
+            # press B key
+            win32api.keybd_event(0x42, 0, 0, 0)
+            time.sleep(0.05)
+            win32api.keybd_event(0x42, 0, win32con.KEYEVENTF_KEYUP, 0)
+        elif game_action in self.movement_keys:
+            # move player in specified direction
+            direction = self.movement_keys[game_action]
+            win32api.keybd_event(direction, 0, 0, 0)
+            time.sleep(0.2)
+            win32api.keybd_event(direction, 0, win32con.KEYEVENTF_KEYUP, 0)

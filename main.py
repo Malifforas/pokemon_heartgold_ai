@@ -7,7 +7,11 @@ from screen import Screen
 from nuzlock import Nuzlock
 
 import config
+from screen import Screen
 
+screen = Screen()
+screen.capture_screenshot()
+game_state = screen.get_game_state()
 
 def main():
     # Initialize objects

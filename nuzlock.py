@@ -12,6 +12,11 @@ caught_pokemon = []
 visited_areas = {}
 
 # function to check if a pokemon has already been caught
+class Nuzlock:
+    def __init__(self):
+        self.api = PokemonAPI()
+        self.caught_pokemon = []
+        self.visited_areas = {}
 def is_pokemon_caught(pokemon_name):
     for pokemon in caught_pokemon:
         if pokemon["name"] == pokemon_name:
