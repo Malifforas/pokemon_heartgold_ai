@@ -20,9 +20,10 @@ import win32con
 
 
 class Screen:
-    def __init__(self, image_path, confidence_threshold=0.9):
-        self.image = Image.open(image_path)
-        self.confidence_threshold = confidence_threshold
+    def __init__(self, name, matcher=None, region=None):
+        self.name = name
+        self.matcher = matcher
+        self.region = region
 
     def capture_screenshot(self):
         screenshot = pyautogui.screenshot()
@@ -49,22 +50,15 @@ class Screen:
 
         return None
 
-    def is_loaded(self):
-        """
-        Returns True if the screen is loaded and ready to be used, False otherwise.
-        """
-        if self.game_state == GameState.IN_BATTLE:
-            return self.battle.is_loaded()
-        elif self.game_state == GameState.IN_MENU:
-            return self.menu.is_loaded()
-        else:
-            return False
-
     def wait_until_loaded(self):
         while not self.is_loaded():
-            self.capture_screenshot()
             time.sleep(1)
 
+    def is_loaded(self):
+        if self.matcher is None:
+            return True
+
+        return self.matcher.exists(self.region)
 
 def find_game_window():
     window_name = "Game Window"  # change this to match your game window title
