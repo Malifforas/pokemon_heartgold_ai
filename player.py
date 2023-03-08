@@ -100,7 +100,33 @@ class RewardSystem:
 
         def start(self):
             # Find game window
-            # TODO: Get current Pokemon team using PokeAPI
+            game_window = find_game_window()
+
+            # Initialize PokeAPI client
+            client = pokeapi.V2Client()
+
+            # Get current Pokemon team using PokeAPI
+            current_team = client.get_team()
+
+            # Start game loop
+            while True:
+                # Capture screen
+                screen_image = capture_screen(game_window)
+
+                # Preprocess screen image for Q-learning
+                processed_image = preprocess_image(screen_image)
+
+                # Get current game state
+                game_state = get_game_state(processed_image, current_team)
+
+                # Implement Q-learning to choose next action
+                next_action = q_learning(game_state)
+
+                # Map chosen action to game action
+                game_action = map_action(next_action)
+
+                # Perform action
+                perform_action(game_window, game_action)
 
             # Start game loop
             while True:
