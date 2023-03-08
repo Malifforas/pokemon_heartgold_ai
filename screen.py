@@ -1,3 +1,5 @@
+from tkinter import Image
+
 import cv2
 import numpy as np
 import pyautogui
@@ -18,8 +20,9 @@ import win32con
 
 
 class Screen:
-    def __init__(self):
-        self._screenshot = None
+    def __init__(self, image_path, confidence_threshold=0.9):
+        self.image = Image.open(image_path)
+        self.confidence_threshold = confidence_threshold
 
     def capture_screenshot(self):
         screenshot = pyautogui.screenshot()
@@ -47,7 +50,15 @@ class Screen:
         return None
 
     def is_loaded(self):
-        return self.get_player_position() is not None
+        """
+        Returns True if the screen is loaded and ready to be used, False otherwise.
+        """
+        if self.game_state == GameState.IN_BATTLE:
+            return self.battle.is_loaded()
+        elif self.game_state == GameState.IN_MENU:
+            return self.menu.is_loaded()
+        else:
+            return False
 
     def wait_until_loaded(self):
         while not self.is_loaded():
@@ -123,3 +134,39 @@ def preprocess_image(image):
     resized_image = cv2.resize(cropped_image, (80, 80))
 
     return resized_image
+
+
+class Screen:
+    def __init__(self):
+        self._screenshot = None
+
+    def capture_screenshot(self):
+        screenshot = pyautogui.screenshot()
+        if screenshot is not None:
+            self._screenshot = np.array(screenshot)
+
+    def get_player_position(self):
+
+
+     def is_loaded(self):
+        return self.get_player_position() is not None
+
+    def wait_until_loaded(self):
+        while not self.is_loaded():
+            self.capture_screenshot()
+            time.sleep(1)
+
+    def get_game_state(self):
+        if self._screenshot is None:
+            return None
+
+        # preprocess the screenshot
+        preprocessed_image = preprocess_image(self._screenshot)
+
+        # create dictionary with game state information
+        game_state = {
+            "player_position": self.get_player_position(),
+            "preprocessed_image": preprocessed_image
+        }
+
+        return game_state
