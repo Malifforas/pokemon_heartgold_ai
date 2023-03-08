@@ -5,7 +5,7 @@ import os
 import json
 import random
 import math
-
+import screen
 import pokeapi
 import requests
 
@@ -16,15 +16,48 @@ from api import PokemonAPI
 
 class RewardSystem:
     def __init__(self):
-        self.total_reward = 0
-        self.last_action = None
         self.last_state = None
+        self.last_action = None
+        self.last_reward = None
+        self.pokemon_api = pokeapi.V2Client()
 
-    def give_reward(self, reward):
-        self.total_reward += reward
+    def get_reward(self, state, action, next_state, pokeheartgold=None):
+        # Calculate current and next state values
+        current_player_pokemon = pokeheartgold.get_active_pokemon()
+        current_opponent_pokemon = pokeheartgold.get_opponent_active_pokemon()
+        current_player_hp = int(
+            current_player_pokemon.current_hp / current_player_pokemon.stats.hp * 100 // 20)
+        current_opponent_hp = int(
+            current_opponent_pokemon.current_hp / current_opponent_pokemon.stats.hp * 100 // 20)
+        current_level_diff = current_player_pokemon.level - current_opponent_pokemon.level
 
-    def get_total_reward(self):
-        return self.total_reward
+        next_player_pokemon = pokeheartgold.get_active_pokemon()
+        next_opponent_pokemon = pokeheartgold.get_opponent_active_pokemon()
+        next_player_hp = int(next_player_pokemon.current_hp / next_player_pokemon.stats.hp * 100 // 20)
+        next_opponent_hp = int(
+            next_opponent_pokemon.current_hp / next_opponent_pokemon.stats.hp * 100 // 20)
+        next_level_diff = next_player_pokemon.level - next_opponent_pokemon.level
+
+        # Get current and next state
+        current_state = current_player_hp * 15 + current_opponent_hp * 3 + current_level_diff + 37
+        next_state = next_player_hp * 15 + next_opponent_hp * 3 + next_level_diff + 37
+
+        # Calculate reward
+        reward = 0.0
+        if next_player_pokemon.current_hp == 0:
+            reward = -1.0
+        elif next_opponent_pokemon.current_hp == 0:
+            reward = 1.0
+
+        # Update Q-Table
+        current_q = q_table[current_state][action]
+        next_max_q = np.max(q_table[next_state])
+        new_q = current_q + ALPHA * (reward + GAMMA * next_max_q - current_q)
+        q_table[current_state][action] = new_q
+
+        return reward
+
+        return reward
     class Player:
         def __init__(self):
             # Initialize screen, controller, and reward system
@@ -127,8 +160,6 @@ class RewardSystem:
 
                 # Perform action
                 perform_action(game_window, game_action)
-
-            # Start game loop
             while True:
                 # Capture screen
                 # TODO: Preprocess screen image for Q-learning
