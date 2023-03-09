@@ -1,12 +1,10 @@
-from time import sleep
 from random import randint
-
-from desmu import Emulator
-from api import PokemonAPI
-from screen import Screen
-from nuzlock import Nuzlock
+from time import sleep
 
 import config
+from api import PokemonAPI
+from desmu import Emulator
+from nuzlock import Nuzlock
 from screen import Screen
 
 screen = Screen()
