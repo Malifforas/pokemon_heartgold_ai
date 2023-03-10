@@ -1,20 +1,41 @@
-import requests
+import random
 
 
 class Pokemon:
-    def __init__(self, name):
-        self.name = name
-        self.url = f"https://pokeapi.co/api/v2/pokemon/{name}"
+    # existing code omitted for brevity
 
-    def get_info(self):
-        response = requests.get(self.url)
-        if response.status_code == 200:
-            data = response.json()
-            return {
-                'name': data['name'],
-                'id': data['id'],
-                'types': [type['type']['name'] for type in data['types']],
-                'moves': [move['move']['name'] for move in data['moves']]
-            }
+    def choose_move(self, opponent):
+        best_move = None
+        best_move_score = -1
+
+        # Iterate over all available moves
+        for move_name in self.get_info()['moves']:
+            move = Move(move_name)
+
+            # Calculate the score for this move
+            score = 0
+
+            # Type advantage
+            type_score = move.get_type_score(opponent)
+            score += type_score
+
+            # Move power
+            score += move.power
+
+            # Accuracy
+            score += move.accuracy
+
+            # Status effect
+            if move.status_effect is not None:
+                score += move.status_effect.get_effect_score(self, opponent)
+
+            # Update the best move if this move has a higher score
+            if score > best_move_score:
+                best_move = move
+                best_move_score = score
+
+        # Return the best move or a random move if no moves available
+        if best_move is None:
+            return random.choice(self.get_info()['moves'])
         else:
-            return None
+            return best_move.name
